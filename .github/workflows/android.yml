@@ -19,6 +19,12 @@ jobs:
         with:
           workspaces: rust/cam2me-ffi
 
+      # The structural floor (macula-codebase-checks#9): a function that
+      # nests past three blocks, goes past cognitive complexity 15 or runs
+      # past 60 lines fails here, against rust/cam2me-ffi/clippy.toml.
+      - name: Structural lint (clippy, deny warnings)
+        run: cargo clippy --manifest-path rust/cam2me-ffi/Cargo.toml --all-targets --locked -- -D warnings
+
       - uses: nttld/setup-ndk@v1
         id: ndk
         with:

@@ -48,3 +48,10 @@ macula-rust-ffi = "0.3"
 # no standalone uniffi-bindgen-cli exists on crates.io to lean on
 # instead (checked before adding this).
 uniffi = { version = "0.32", features = ["cli"] }
+
+[lints.clippy]
+# The structural floor (macula-codebase-checks#9): clippy.toml holds the
+# thresholds these are measured against.
+excessive_nesting = "deny"
+cognitive_complexity = "deny"
+too_many_lines = "deny"
