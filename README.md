@@ -9,16 +9,19 @@ built; camera capture itself is not yet.
 
 ## Architecture
 
+The C4 model, what the app talks to and what it is made of, is in
+[architecture/README.md](architecture/README.md). Its diagrams are drawn by
+`architecture/c4_diagrams.py` into `assets/`.
+
+![macula-cam2me system context](assets/c4-context.svg)
+
 Two separate native apps, sharing nothing but the Rust core:
 
-```
-macula-cam2me/
-├── rust/cam2me-ffi/          # this app's own top-level build target,
-│                              # depends on macula-rust-ffi (crates.io)
-├── android/                  # Kotlin, Gradle, generated bindings via JNA
-├── ios/                      # Swift, XcodeGen, generated bindings via XCFramework
-└── scripts/                  # cross-compile the Rust core + regenerate bindings
-```
+- `rust/cam2me-ffi/`: this app's own top-level build target, which depends on
+  `macula-rust-ffi` from crates.io
+- `android/`: Kotlin and Gradle, with bindings generated for JNA
+- `ios/`: Swift and XcodeGen, with bindings generated into an XCFramework
+- `scripts/`: cross-compile the Rust core and regenerate the bindings
 
 No Flutter, no Kotlin Multiplatform. Both `macula-rust-ffi`'s Kotlin and
 Swift bindings already exist and are already verified (generated,
@@ -90,7 +93,9 @@ builds.
 ## Current status
 
 Both apps generate a puzzle-hardened Ed25519 identity via
-`FfiKeyPair.generate()`, persisted across restarts. Android additionally
+`FfiKeyPair.generate()`. Android keeps it across restarts in the Android
+Keystore; iOS still mints a new one on every launch
+([#5](https://github.com/macula-apps/macula-cam2me/issues/5)). Android additionally
 has: a contact list (Room-backed), a presence heartbeat (pubsub, hashed
 phone numbers, online/offline status), and station connectivity --
 either up to 3 nearest stations auto-discovered via device location and
@@ -98,6 +103,13 @@ either up to 3 nearest stations auto-discovered via device location and
 `StationDiscovery`), or a single manually-picked station when location
 access is off. Both connection modes maintain one or more
 `FfiSession`s and run a `PresenceHeartbeat` per session.
+
+None of that reaches the live fleet today: the pinned Rust core predates wire
+1.0, the realm constant is not io.macula's, and the directory has since been
+renamed `mcl-stations/list_stations`
+([#3](https://github.com/macula-apps/macula-cam2me/issues/3)). The presence
+payload needs a redesign before it goes live
+([#4](https://github.com/macula-apps/macula-cam2me/issues/4)).
 
 Camera capture, dial/pickup, and a real call UI are not built yet --
 that's the next pass, on both platforms.

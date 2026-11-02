@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 920" role="img" aria-label="macula-cam2me components">
+<title>macula-cam2me components</title>
+<style>
+.t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
+.t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
+.t-rel { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.t-code { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; }
+.t-type { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+.t-bound { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+.t-leg { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; }
+.edge { fill: none; stroke-width: 1.25; }
+.edge-later { fill: none; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bg { fill: #FFFFFF; }
+.b-sys { fill: #F5E9CC; stroke: #A56F0A; stroke-width: 2; }
+.b-per { fill: #E3EBF2; stroke: #3B5B7A; stroke-width: 1.25; }
+.b-mac { fill: #E6E4EE; stroke: #5E5A78; stroke-width: 1.25; }
+.b-ext { fill: #ECEFED; stroke: #8A9791; stroke-width: 1.25; }
+.b-cmp { fill: #FFFFFF; stroke: #8A9791; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #8A9791; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #B3BDB8; stroke-width: 1; }
+.head { fill: #3B5B7A; }
+.t-name, .t-code { fill: #16201D; }
+.t-type, .t-bound, .t-leg { fill: #66736E; }
+.t-desc { fill: #34413C; }
+.t-rel { fill: #66736E; stroke: #FFFFFF; }
+.edge, .edge-later { stroke: #8A9791; }
+.arrowhead { fill: #8A9791; }
+@media (prefers-color-scheme: dark) {
+.bg { fill: #171F1C; }
+.b-sys { fill: #3A2E13; stroke: #E3AA3C; }
+.b-per { fill: #1D2A36; stroke: #8EB4D8; }
+.b-mac { fill: #26243A; stroke: #A9A4C8; }
+.b-ext { fill: #1C2421; stroke: #7D8B85; }
+.b-cmp { fill: #171F1C; stroke: #7D8B85; }
+.b-later { stroke: #7D8B85; }
+.bound { stroke: #4A5752; }
+.head { fill: #8EB4D8; }
+.t-name, .t-code { fill: #E6ECE9; }
+.t-type, .t-bound, .t-leg { fill: #93A09A; }
+.t-desc { fill: #C3CDC8; }
+.t-rel { fill: #93A09A; stroke: #171F1C; }
+.edge, .edge-later { stroke: #7D8B85; }
+.arrowhead { fill: #7D8B85; }
+}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1000" height="920"/>
+<rect class="bound" x="16" y="40" width="968" height="650" rx="12"/>
+<text class="t-bound" x="32" y="62">macula-cam2me Android app [Container: Kotlin, Compose]</text>
+<rect class="b-cmp" x="32" y="70" width="456" height="120" rx="10"/>
+<text class="t-code" x="48" y="98">MainActivity</text>
+<text class="t-type" x="48" y="116">[Compose entry point]</text>
+<text class="t-desc" x="48" y="140">Wires the node key, station connect, the heartbeats and</text>
+<text class="t-desc" x="48" y="156">the contact list together; reconnects when the station</text>
+<text class="t-desc" x="48" y="172">preference or the location permission changes</text>
+<rect class="b-cmp" x="512" y="70" width="456" height="120" rx="10"/>
+<text class="t-code" x="528" y="98">onboarding</text>
+<text class="t-type" x="528" y="116">[OnboardingScreen, OwnerPhoneNumber]</text>
+<text class="t-desc" x="528" y="140">Asks once for the owner's own phone number and keeps it</text>
+<text class="t-desc" x="528" y="156">in DataStore; presence publishes its hash</text>
+<rect class="b-sys" x="32" y="220" width="456" height="150" rx="10"/>
+<text class="t-code" x="48" y="248">reachability</text>
+<text class="t-type" x="48" y="266">[NodeKeyPair, MeshSessionPool, StationDiscovery]</text>
+<text class="t-desc" x="48" y="290">NodeKeyPair: one Ed25519 key per install, in the Keystore.</text>
+<text class="t-desc" x="48" y="306">StationPreference: auto (nearest 3 by coarse location) or a</text>
+<text class="t-desc" x="48" y="322">fixed station. MeshSessionPool: up to 3 sessions, diffed,</text>
+<text class="t-desc" x="48" y="338">pinned trust for a discovered node id, WebPKI otherwise</text>
+<rect class="b-sys" x="512" y="220" width="456" height="150" rx="10"/>
+<text class="t-code" x="528" y="248">presence</text>
+<text class="t-type" x="528" y="266">[PresenceHeartbeat, PhonePresence]</text>
+<text class="t-desc" x="528" y="290">One loop per session: every 30 s publish {phone_hash,</text>
+<text class="t-desc" x="528" y="306">stations} on cam2me.presence, and match what it hears</text>
+<text class="t-desc" x="528" y="322">against the contacts; a match stores the publisher's</text>
+<text class="t-desc" x="528" y="338">node id and stations in phone_presence</text>
+<rect class="b-cmp" x="32" y="400" width="456" height="120" rx="10"/>
+<text class="t-code" x="48" y="428">contacts</text>
+<text class="t-type" x="48" y="446">[Contact, ContactDao, ContactListScreen]</text>
+<text class="t-desc" x="48" y="470">The owner's contacts by phone number, with each one's</text>
+<text class="t-desc" x="48" y="486">last presence (online, node id, stations)</text>
+<rect class="b-mac" x="512" y="400" width="456" height="120" rx="10"/>
+<text class="t-code" x="528" y="428">macula-rust-ffi</text>
+<text class="t-type" x="528" y="446">[Rust, UniFFI Kotlin bindings, via cam2me-ffi]</text>
+<text class="t-desc" x="528" y="470">FfiKeyPair, FfiSession (connect, call, publish,</text>
+<text class="t-desc" x="528" y="486">subscribe, recvEvent). Pinned at 0.3.1, before wire 1.0</text>
+<rect class="b-cmp" x="32" y="550" width="456" height="120" rx="10"/>
+<text class="t-code" x="48" y="578">Cam2MeDatabase</text>
+<text class="t-type" x="48" y="596">[Room, schema v1]</text>
+<text class="t-desc" x="48" y="620">Two tables: contacts and phone_presence</text>
+<rect class="b-cmp" x="512" y="550" width="456" height="120" rx="10"/>
+<text class="t-code" x="528" y="578">Keyring</text>
+<text class="t-type" x="528" y="596">[io.crates.keyring, NDK context]</text>
+<text class="t-desc" x="528" y="620">Initialises the Android keystore context the Rust</text>
+<text class="t-desc" x="528" y="636">keystore needs before NodeKeyPair runs</text>
+<rect class="b-cmp" x="32" y="720" width="456" height="104" rx="10"/>
+<text class="t-code" x="48" y="748">iOS app</text>
+<text class="t-type" x="48" y="766">[SwiftUI skeleton, XcodeGen]</text>
+<text class="t-desc" x="48" y="790">Generates a key on every launch and shows the node id;</text>
+<text class="t-desc" x="48" y="806">no mesh, no presence yet (#5)</text>
+<rect class="b-later" x="512" y="720" width="456" height="104" rx="10"/>
+<text class="t-code" x="528" y="748">camera stream</text>
+<text class="t-type" x="528" y="766">[planned: capture, serve, dial]</text>
+<text class="t-desc" x="528" y="790">Capture and serve the stream; a contact dials in</text>
+<text class="t-desc" x="528" y="806">through a station (#6)</text>
+<path class="edge" d="M488 130H512" marker-end="url(#a)"/>
+<text class="t-rel" x="500" y="168" text-anchor="middle" transform="rotate(-90 500 168)">asks once</text>
+<path class="edge" d="M260 190V220" marker-end="url(#a)"/>
+<text class="t-rel" x="268" y="212">connects on launch</text>
+<path class="edge" d="M488 295H512" marker-end="url(#a)"/>
+<text class="t-rel" x="500" y="340" text-anchor="middle" transform="rotate(-90 500 340)">per session</text>
+<path class="edge" d="M400 370V390H620V400" marker-end="url(#a)"/>
+<text class="t-rel" x="412" y="384">connect, call</text>
+<path class="edge" d="M800 370V400" marker-end="url(#a)"/>
+<text class="t-rel" x="812" y="392">publish, subscribe, recvEvent</text>
+<path class="edge" d="M260 520V550" marker-end="url(#a)"/>
+<text class="t-rel" x="268" y="542">reads and writes</text>
+<path class="edge" d="M740 520V550" marker-end="url(#a)"/>
+<text class="t-rel" x="752" y="542">keystore load and save</text>
+<text class="t-desc" x="40" y="850">rust/cam2me-ffi is only a build target: it re-exports macula-rust-ffi so the linker keeps it, and scripts/build-rust-*.sh</text>
+<text class="t-desc" x="40" y="866">cross-compile it and regenerate the Kotlin and Swift bindings on every build; no generated code is committed.</text>
+<rect class="b-sys" x="24" y="892" width="22" height="14" rx="3"/>
+<text class="t-leg" x="54" y="904">In scope</text>
+<rect class="b-per" x="110.8" y="892" width="22" height="14" rx="3"/>
+<text class="t-leg" x="140.8" y="904">Person</text>
+<rect class="b-mac" x="184.39999999999998" y="892" width="22" height="14" rx="3"/>
+<text class="t-leg" x="214.39999999999998" y="904">Macula infrastructure</text>
+<rect class="b-ext" x="357.0" y="892" width="22" height="14" rx="3"/>
+<text class="t-leg" x="387.0" y="904">External system</text>
+<rect class="b-cmp" x="490.0" y="892" width="22" height="14" rx="3"/>
+<text class="t-leg" x="520.0" y="904">Container or component</text>
+<rect class="b-later" x="669.2" y="892" width="22" height="14" rx="3"/>
+<text class="t-leg" x="699.2" y="904">Planned, not built</text>
+</svg>
