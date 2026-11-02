@@ -1,0 +1,25 @@
+# The app's C4 model: what it talks to, and what it is made of
+# (macula-codebase-checks#10, macula-cam2me#1). Two diagrams in assets/, a
+# context one and a component one, each shown by README.md or
+# architecture/README.md, and this workflow red until they are there.
+#
+# Its own workflow, started by every pull request and by a push to main with
+# no path filter, so a diagram-only change is checked and a red diagram never
+# blocks the Android or iOS build. The check is the house's, pinned by full
+# commit sha as every shared call is.
+
+name: c4 model
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  c4-model:
+    permissions:
+      contents: read
+    uses: macula-io/macula-ci-images/.github/workflows/c4-model.yml@c91235da28889b965cf39e607b28e785862e7552
