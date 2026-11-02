@@ -69,10 +69,9 @@
 <rect class="b-ext" x="40" y="450" width="280" height="136" rx="10"/>
 <text class="t-name" x="56" y="478">Android platform</text>
 <text class="t-type" x="56" y="496">[External system]</text>
-<text class="t-desc" x="56" y="520">Keystore holds the node seed;</text>
+<text class="t-desc" x="56" y="520">The Keystore holds the node seed;</text>
 <text class="t-desc" x="56" y="536">coarse location picks the nearest</text>
-<text class="t-desc" x="56" y="552">stations; Room stores contacts</text>
-<text class="t-desc" x="56" y="568">and presence</text>
+<text class="t-desc" x="56" y="552">stations</text>
 <rect class="b-mac" x="360" y="450" width="280" height="136" rx="10"/>
 <text class="t-name" x="376" y="478">Macula stations</text>
 <text class="t-type" x="376" y="496">[Macula infrastructure]</text>
@@ -92,12 +91,12 @@
 <path class="edge-later" d="M810 150V180H600V210" marker-end="url(#a)"/>
 <text class="t-rel" x="620" y="168">watches the camera (planned, #6)</text>
 <path class="edge" d="M400 362V410H180V450" marker-end="url(#a)"/>
-<text class="t-rel" x="196" y="402">seed, last location, contacts</text>
+<text class="t-rel" x="196" y="402">node seed, last location</text>
 <path class="edge" d="M500 362V450" marker-end="url(#a)"/>
 <text class="t-rel" x="508" y="418">up to 3 sessions;</text>
 <text class="t-rel" x="508" y="434">presence pub/sub</text>
 <path class="edge" d="M600 362V410H820V450" marker-end="url(#a)"/>
-<text class="t-rel" x="620" y="402">list_stations near (lat, lng)</text>
+<text class="t-rel" x="620" y="402">list_stations near (lat, lng): broken (#3)</text>
 <text class="t-desc" x="40" y="616">The contact is the same app on another phone: both publish a heartbeat on cam2me.presence through every station they hold,</text>
 <text class="t-desc" x="40" y="634">and each matches what it hears against its own contacts. Pull model: a viewer will dial the phone through one of those stations;</text>
 <text class="t-desc" x="40" y="652">nothing listens on the phone itself. Today the app reaches no live station (#3), and the presence payload needs a redesign (#4).</text>

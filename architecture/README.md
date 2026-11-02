@@ -19,7 +19,7 @@ the app as it is on `main`, with those gaps marked, not the app as planned.
 | macula-cam2me | In scope | One node identity per phone. Holds up to three station sessions at once, publishes a presence heartbeat on `cam2me.presence` through each, hears everyone else's, and matches what it hears against the owner's contacts |
 | Phone owner | Person | Installs the app, enters their own phone number once, adds contacts by phone number, and picks automatic (nearest stations) or one fixed station |
 | Contact | Person | Another phone running cam2me whose number the owner added. Later, the person who dials in to watch the camera ([#6](https://github.com/macula-apps/macula-cam2me/issues/6)) |
-| Android platform | External system | The Android Keystore holds the node seed, coarse location picks the nearest stations, and Room stores contacts and the presence each one was last seen with |
+| Android platform | External system | The Android Keystore holds the node seed, and coarse location picks the nearest stations. Contacts and presence live in the app's own Room database (Level 2) |
 | Macula stations | Macula infrastructure | The QUIC sessions, the pubsub fan-out of `cam2me.presence`, and the route the `list_stations` call takes. The live fleet runs wire 1.0, which the pinned SDK cannot speak (#3) |
 | mcl-stations | Macula infrastructure | The station directory, nearest first. The app still calls it by its retired name, `hecate_stations.list_stations`, in a realm that is not io.macula (#3), so discovery falls back to the fixed station |
 
