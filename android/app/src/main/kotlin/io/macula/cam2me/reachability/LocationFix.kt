@@ -3,19 +3,24 @@ package io.macula.cam2me.reachability
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Bundle
+import android.os.Looper
 import androidx.core.content.ContextCompat
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * A single best-effort location fix for nearest-station discovery.
  * Coarse precision only -- see AndroidManifest's own note on why FINE
  * isn't requested; plain [LocationManager] rather than Play Services'
- * FusedLocationProvider, since a one-off cached fix doesn't need it and
- * this project's stack otherwise stays clear of Big Tech SDKs in the
- * data path. Returns null whenever a fix genuinely isn't available
- * (permission not granted, no provider enabled, or nothing cached yet)
- * -- the caller's job is to fall back to the static station list, not to
- * surface this as an app error.
+ * FusedLocationProvider, since a one-off fix doesn't need it and this
+ * project's stack otherwise stays clear of Big Tech SDKs in the data
+ * path. Both entry points return null whenever a fix genuinely isn't
+ * available (permission not granted, no provider enabled, or nothing
+ * cached yet) -- the caller's job is to fall back to the static station
+ * list, not to surface this as an app error.
  */
 object LocationFix {
     fun hasPermission(context: Context): Boolean =
@@ -40,4 +45,72 @@ object LocationFix {
             }
             .maxByOrNull { it.time }
     }
+
+    /** One coarse fix, asked for now rather than read from the cache.
+     *
+     * For the phone that has nothing cached -- a new device, location
+     * just switched on, a reboot nothing has asked for a fix since. It
+     * asks a single time and returns as soon as a provider answers; the
+     * caller owns the time limit (`fixForDiscovery`) and no second
+     * request is ever made, so a phone whose providers cannot answer
+     * keeps the fallback station instead of polling. Cancelling the
+     * calling coroutine removes the listener, which is what keeps the
+     * request bounded when the caller's limit expires. */
+    @Suppress("DEPRECATION") // requestSingleUpdate: one fix, and no battery-held listener after it
+    suspend fun currentOnce(context: Context): Location? {
+        if (!hasPermission(context)) return null
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+        val provider = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+            .firstOrNull { enabled(manager, it) } ?: return null
+        return suspendCancellableCoroutine { continuation ->
+            val listener = singleUpdateListener { fix ->
+                if (continuation.isActive) continuation.resume(fix)
+            }
+            continuation.invokeOnCancellation { manager.removeUpdates(listener) }
+            try {
+                manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+            } catch (e: SecurityException) {
+                if (continuation.isActive) continuation.resume(null)
+            }
+        }
+    }
+
+    private fun enabled(manager: LocationManager, provider: String): Boolean =
+        try {
+            manager.isProviderEnabled(provider)
+        } catch (e: IllegalArgumentException) {
+            false // the device has no such provider at all
+        }
 }
+
+/** The listener a single requested fix needs, kept out of [LocationFix]
+ * so a JVM test can check its shape without a device.
+ *
+ * Every method the interface declares is overridden, not only the one
+ * that delivers a position: API 26-29 has no default methods, so the
+ * framework calling an unimplemented one is an AbstractMethodError on the
+ * main looper -- the app dying when the user switches location off, or a
+ * provider changes status, while the fix is being waited for. Switching
+ * location off answers null at once, so discovery stops waiting instead
+ * of running out the limit. */
+@Suppress("DEPRECATION") // onStatusChanged: still called on API 26-29
+internal fun singleUpdateListener(onFix: (Location?) -> Unit): LocationListener =
+    object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            onFix(location)
+        }
+
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
+            // Neither an answer nor a failure: a provider that stops
+            // answering is covered by the caller's time limit.
+        }
+
+        override fun onProviderEnabled(provider: String) = Unit
+
+        override fun onProviderDisabled(provider: String) {
+            onFix(null)
+        }
+    }
+
+/** The position in the shape discovery and its tests use. */
+internal fun Location.toFix(): Fix = Fix(latitude, longitude)

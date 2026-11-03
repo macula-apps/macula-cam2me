@@ -39,6 +39,8 @@ import io.macula.cam2me.reachability.SettingsScreen
 import io.macula.cam2me.reachability.StationDiscovery
 import io.macula.cam2me.reachability.StationPreference
 import io.macula.cam2me.reachability.connectionPlan
+import io.macula.cam2me.reachability.fixForDiscovery
+import io.macula.cam2me.reachability.toFix
 
 /**
  * Wires this device's node keypair, nearest-station discovery, mesh
@@ -153,7 +155,13 @@ private fun ConnectedApp(
         val bootstrap = connectOrNull(listOf(manualTarget), nodeKeyPair)
 
         val plan = if (preference.autoDiscovery && locationGranted && bootstrap != null) {
-            val fix = LocationFix.lastKnown(context)
+            // The cached fix when Android has one; otherwise one requested
+            // fix, bounded in time (#9). The fallback link above is already
+            // up, so this wait is never on the launch path.
+            val fix = fixForDiscovery(
+                cached = LocationFix.lastKnown(context)?.toFix(),
+                requestOnce = { LocationFix.currentOnce(context)?.toFix() },
+            )
             val discovered = fix?.let {
                 StationDiscovery.nearestStations(bootstrap, it.latitude, it.longitude, limit = 3)
             }
