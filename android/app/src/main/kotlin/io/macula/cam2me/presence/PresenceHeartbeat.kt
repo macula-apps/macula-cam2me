@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,15 +44,33 @@ private const val PRESENCE_TOPIC = "cam2me.presence"
  * them, so one loop covers every station. [myStations] is the full set the
  * pool was opened for.
  *
- * A publish that fails (no link up for a moment while the pool redials)
- * is tried again at the next interval rather than ending the loop.
+ * A subscribe or publish that fails (no link up for a moment while the
+ * pool redials, or a station refusing it) is tried again at the next
+ * interval; a closed pool ends the loop. No [FfiException] leaves it.
+ * The connection indicator shows offline from the pool's own status.
  *
  * The payload is the one the app has always sent; issue #4 redesigns it
  * (it exposes a hash of the phone number, and the sender is not bound to
  * it), so nothing here is meant to outlive that.
  */
-/** Subscribes through [subscribe]. */
-internal suspend fun <S> subscribeWhenLinked(retryIntervalMs: Long, subscribe: suspend () -> S): S? = subscribe()
+/**
+ * Subscribes through [subscribe], trying again every [retryIntervalMs]
+ * while no link takes the register (none up yet, or the station refused
+ * it): the pool redials, so a later try can succeed. Null once the pool is
+ * closed, since nothing will take it then. Never throws an
+ * [FfiException]: one escaping the heartbeat's coroutine would end the app.
+ */
+internal suspend fun <S> subscribeWhenLinked(retryIntervalMs: Long, subscribe: suspend () -> S): S? {
+    while (true) {
+        try {
+            return subscribe()
+        } catch (_: FfiException.Closed) {
+            return null
+        } catch (_: FfiException) {
+            delay(retryIntervalMs)
+        }
+    }
+}
 
 class PresenceHeartbeat(
     private val scope: CoroutineScope,
@@ -99,7 +118,9 @@ class PresenceHeartbeat(
                 lastPublishAtMs = now
                 try {
                     publish(myHash)
-                } catch (_: FfiException.NoLink) {
+                } catch (_: FfiException.Closed) {
+                    return
+                } catch (_: FfiException) {
                     // Tried again at the next interval.
                 }
             }

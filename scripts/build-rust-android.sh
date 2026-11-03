@@ -72,7 +72,9 @@ done
 # nothing loads; android-native-keyring-store's own copy would even carry a
 # second ndk-context, not the one the SDK reads. Keyring.kt calls the hook
 # in libmacula_rust_ffi.so, so the build fails if that library lacks it.
-NM="$(find "${ANDROID_NDK_HOME:?}/toolchains/llvm/prebuilt" -name llvm-nm | head -1)"
+# -print -quit, not `| head -1`: under pipefail, head exiting first can
+# kill find with SIGPIPE and fail the build.
+NM="$(find "${ANDROID_NDK_HOME:?}/toolchains/llvm/prebuilt" -name llvm-nm -print -quit)"
 if [ ! -x "$NM" ]; then
     echo "no llvm-nm under $ANDROID_NDK_HOME/toolchains/llvm/prebuilt" >&2
     exit 1

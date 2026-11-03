@@ -58,8 +58,15 @@ object MeshPool {
     private fun List<KnownStation>.nodeIds(): Set<String> = map { it.nodeIdHex }.toSet()
 }
 
-/** The station sets to try, in order, once discovery has answered (or not). */
-internal fun connectionPlan(discovered: List<KnownStation>?, fallback: KnownStation): List<List<KnownStation>> =
-    listOf(discovered?.takeIf { it.isNotEmpty() } ?: listOf(fallback))
+/** The station sets to try, in order, once discovery has answered (or
+ * not): the discovered stations, then the fallback that carried discovery.
+ * [MeshPool.connect] closes the pool it holds before it dials a new set,
+ * so a discovered set that cannot be reached must not leave the app
+ * offline while the fallback answers. */
+internal fun connectionPlan(discovered: List<KnownStation>?, fallback: KnownStation): List<List<KnownStation>> {
+    val fallbackOnly = listOf(fallback)
+    val nearest = discovered?.takeIf { it.isNotEmpty() && it != fallbackOnly } ?: return listOf(fallbackOnly)
+    return listOf(nearest, fallbackOnly)
+}
 
 fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

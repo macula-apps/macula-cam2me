@@ -26,6 +26,12 @@ XCFRAMEWORK_OUT="$REPO_ROOT/ios/MaculaRustFFI.xcframework"
 # XCFramework directly, not by string-matching a library name.
 LIB_NAME="libcam2me_ffi.a"
 
+# One deployment target for the C code (aws-lc, ring) and the Rust link,
+# the app's own (ios/project.yml). Without it the cc crate compiles C for
+# the SDK's newest iOS while rustc links for 10.0, and aws-lc's
+# ___chkstk_darwin calls do not resolve in that link.
+export IPHONEOS_DEPLOYMENT_TARGET="17.0"
+
 if [[ "$(uname)" != "Darwin" ]]; then
     echo "This script must run on macOS (xcodebuild -create-xcframework is Apple-only)." >&2
     exit 1

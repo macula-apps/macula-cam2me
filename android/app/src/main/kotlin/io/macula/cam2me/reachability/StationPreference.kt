@@ -47,9 +47,16 @@ object StationPreference {
             )
         }
 
-    /** The node id the fallback station must prove. */
-    internal fun fallbackNodeIdHex(savedHost: String?, savedNodeIdHex: String?): String =
-        savedNodeIdHex ?: DEFAULT_STATION_NODE_ID
+    /** The node id the fallback station must prove. The default station's
+     * id goes with the default host only: a custom host saved without an id
+     * (by a version that kept none) gets an empty one, which the pool
+     * refuses, so the app shows offline until the station is picked again
+     * in Settings, rather than pinning that host to another station. */
+    internal fun fallbackNodeIdHex(savedHost: String?, savedNodeIdHex: String?): String {
+        if (savedNodeIdHex != null) return savedNodeIdHex
+        val host = savedHost ?: DEFAULT_STATION_HOST
+        return if (host == DEFAULT_STATION_HOST) DEFAULT_STATION_NODE_ID else ""
+    }
 
     suspend fun setAutoDiscovery(context: Context) {
         context.stationPreferenceDataStore.edit { it[AUTO_DISCOVERY] = true }

@@ -14,8 +14,10 @@ private const val DEFAULT_QUIC_PORT = 4433
 private const val NODE_ID_BYTES = 32
 private const val TAG = "StationDiscovery"
 
-/** How the list_stations call, which carries this device's location, is sealed. */
-internal val DISCOVERY_CONFIDENTIALITY = FfiConfidentiality.PREFERRED
+/** The list_stations call carries this device's location, so it is sealed
+ * or not sent: REQUIRED refuses a provider that names no KEM key, where
+ * PREFERRED would send the location in the clear. */
+internal val DISCOVERY_CONFIDENTIALITY = FfiConfidentiality.REQUIRED
 
 /**
  * Finds the stations nearest to a device location by calling
@@ -44,6 +46,9 @@ object StationDiscovery {
                 APP_REALM, LIST_STATIONS_PROCEDURE, payload,
                 null, CALL_TIMEOUT_MS, DISCOVERY_CONFIDENTIALITY, null,
             )
+        } catch (e: FfiException.Confidentiality) {
+            Log.w(TAG, "list_stations not sent, it could not be sealed: ${e.reason}, ${e.advertised.size} keys advertised")
+            return null
         } catch (e: FfiException) {
             Log.w(TAG, "list_stations failed: ${e::class.simpleName}")
             return null
