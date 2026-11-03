@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Bundle
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import kotlin.coroutines.resume
@@ -83,11 +84,31 @@ object LocationFix {
 }
 
 /** The listener a single requested fix needs, kept out of [LocationFix]
- * so a JVM test can check its shape without a device. */
+ * so a JVM test can check its shape without a device.
+ *
+ * Every method the interface declares is overridden, not only the one
+ * that delivers a position: API 26-29 has no default methods, so the
+ * framework calling an unimplemented one is an AbstractMethodError on the
+ * main looper -- the app dying when the user switches location off, or a
+ * provider changes status, while the fix is being waited for. Switching
+ * location off answers null at once, so discovery stops waiting instead
+ * of running out the limit. */
+@Suppress("DEPRECATION") // onStatusChanged: still called on API 26-29
 internal fun singleUpdateListener(onFix: (Location?) -> Unit): LocationListener =
     object : LocationListener {
         override fun onLocationChanged(location: Location) {
             onFix(location)
+        }
+
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
+            // Neither an answer nor a failure: a provider that stops
+            // answering is covered by the caller's time limit.
+        }
+
+        override fun onProviderEnabled(provider: String) = Unit
+
+        override fun onProviderDisabled(provider: String) {
+            onFix(null)
         }
     }
 
