@@ -50,7 +50,7 @@
 <rect class="b-cmp" x="32" y="70" width="456" height="120" rx="10"/>
 <text class="t-code" x="48" y="98">MainActivity</text>
 <text class="t-type" x="48" y="116">[Compose entry point]</text>
-<text class="t-desc" x="48" y="140">Wires the node key, station connect, the heartbeats and</text>
+<text class="t-desc" x="48" y="140">Wires the node key, station connect, the heartbeat and</text>
 <text class="t-desc" x="48" y="156">the contact list together; reconnects when the station</text>
 <text class="t-desc" x="48" y="172">preference or the location permission changes</text>
 <rect class="b-cmp" x="512" y="70" width="456" height="120" rx="10"/>
@@ -60,23 +60,23 @@
 <text class="t-desc" x="528" y="156">in DataStore; presence publishes its hash</text>
 <rect class="b-cmp" x="32" y="220" width="456" height="150" rx="10"/>
 <text class="t-code" x="48" y="248">reachability</text>
-<text class="t-type" x="48" y="266">[NodeKeyPair, MeshSessionPool, StationDiscovery]</text>
-<text class="t-desc" x="48" y="290">NodeKeyPair: one Ed25519 key per install, in the Keystore.</text>
+<text class="t-type" x="48" y="266">[NodeKeyPair, MeshPool, StationDiscovery]</text>
+<text class="t-desc" x="48" y="290">NodeKeyPair: one pq_hybrid key per install, in the Keystore.</text>
 <text class="t-desc" x="48" y="306">StationPreference: auto (nearest 3 by coarse location) or a</text>
-<text class="t-desc" x="48" y="322">fixed station. MeshSessionPool: up to 3 sessions, diffed,</text>
-<text class="t-desc" x="48" y="338">pinned trust for a discovered node id, WebPKI otherwise</text>
+<text class="t-desc" x="48" y="322">fixed station. MeshPool: one pool over up to 3 stations,</text>
+<text class="t-desc" x="48" y="338">each pinned to its node id; io.macula's realm key pinned</text>
 <rect class="b-cmp" x="512" y="220" width="456" height="150" rx="10"/>
 <text class="t-code" x="528" y="248">presence</text>
 <text class="t-type" x="528" y="266">[PresenceHeartbeat, PhonePresence]</text>
-<text class="t-desc" x="528" y="290">One loop per session: every 30 s publish {phone_hash,</text>
+<text class="t-desc" x="528" y="290">One loop on the pool: every 30 s publish {phone_hash,</text>
 <text class="t-desc" x="528" y="306">stations} on cam2me.presence, and match what it hears</text>
 <text class="t-desc" x="528" y="322">against the contacts; a match stores the publisher's</text>
 <text class="t-desc" x="528" y="338">node id and stations in phone_presence</text>
 <rect class="b-mac" x="32" y="420" width="456" height="120" rx="10"/>
 <text class="t-code" x="48" y="448">macula-rust-ffi</text>
 <text class="t-type" x="48" y="466">[Rust, UniFFI Kotlin bindings, via cam2me-ffi]</text>
-<text class="t-desc" x="48" y="490">FfiKeyPair, FfiSession (connect, call, publish,</text>
-<text class="t-desc" x="48" y="506">subscribe, recvEvent). Pinned at 0.3.1, before wire 1.0</text>
+<text class="t-desc" x="48" y="490">FfiNodeKey, FfiPool (connect, call, publish, subscribe,</text>
+<text class="t-desc" x="48" y="506">status), FfiSubscription. 0.13, wire 1.0</text>
 <rect class="b-cmp" x="512" y="420" width="456" height="120" rx="10"/>
 <text class="t-code" x="528" y="448">Cam2MeDatabase</text>
 <text class="t-type" x="528" y="466">[Room, schema v1]</text>
@@ -94,7 +94,7 @@
 <rect class="b-cmp" x="32" y="740" width="456" height="104" rx="10"/>
 <text class="t-code" x="48" y="768">iOS app</text>
 <text class="t-type" x="48" y="786">[SwiftUI skeleton, XcodeGen]</text>
-<text class="t-desc" x="48" y="810">Generates a key on every launch and shows the node id;</text>
+<text class="t-desc" x="48" y="810">Generates a pq_hybrid key each launch, shows the node id;</text>
 <text class="t-desc" x="48" y="826">no mesh, no presence yet (#5)</text>
 <rect class="b-later" x="512" y="740" width="456" height="104" rx="10"/>
 <text class="t-code" x="528" y="768">camera stream</text>
@@ -106,11 +106,11 @@
 <path class="edge" d="M260 190V220" marker-end="url(#a)"/>
 <text class="t-rel" x="268" y="212">connects on launch</text>
 <path class="edge" d="M420 190V205H700V220" marker-end="url(#a)"/>
-<text class="t-rel" x="712" y="212">starts one per session</text>
+<text class="t-rel" x="712" y="212">starts one on the pool</text>
 <path class="edge" d="M260 370V420" marker-end="url(#a)"/>
-<text class="t-rel" x="268" y="412">connect, call</text>
+<text class="t-rel" x="268" y="412">connect, call, status</text>
 <path class="edge" d="M600 370V390H420V420" marker-end="url(#a)"/>
-<text class="t-rel" x="432" y="410">publish, subscribe, recvEvent</text>
+<text class="t-rel" x="432" y="410">publish, subscribe, next</text>
 <path class="edge" d="M800 370V420" marker-end="url(#a)"/>
 <text class="t-rel" x="812" y="394">reads contacts,</text>
 <text class="t-rel" x="812" y="410">writes phone_presence</text>

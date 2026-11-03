@@ -37,9 +37,10 @@ fun SettingsScreen(
     currentAutoDiscovery: Boolean,
     currentHost: String,
     currentPort: Int,
+    currentNodeIdHex: String,
     onBack: () -> Unit,
     onSaveAuto: () -> Unit,
-    onSaveManual: (host: String, port: Int) -> Unit,
+    onSaveManual: (station: KnownStation) -> Unit,
 ) {
     val matchedKnown = KNOWN_STATIONS.find { it.host == currentHost && it.port == currentPort }
     var selectedHost by remember {
@@ -54,6 +55,9 @@ fun SettingsScreen(
     var customHost by remember { mutableStateOf(if (matchedKnown == null && !currentAutoDiscovery) currentHost else "") }
     var customPort by remember {
         mutableStateOf(if (matchedKnown == null && !currentAutoDiscovery) currentPort.toString() else "4433")
+    }
+    var customNodeId by remember {
+        mutableStateOf(if (matchedKnown == null && !currentAutoDiscovery) currentNodeIdHex else "")
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -112,18 +116,30 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
+                    // The node id the station proves on the handshake: the
+                    // mesh refuses a station dialed without one, so a
+                    // custom station needs it as much as its host.
+                    OutlinedTextField(
+                        value = customNodeId,
+                        onValueChange = { customNodeId = it.trim() },
+                        label = { Text("Node id (64 hex characters)") },
+                        isError = customNodeId.isNotEmpty() && !isNodeIdHex(customNodeId),
+                        supportingText = { Text("Shown in the station directory as its id") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
                 }
             }
 
             Button(
                 modifier = Modifier.fillMaxWidth().padding(24.dp),
-                enabled = selectedHost != CUSTOM_HOST_KEY || (customHost.isNotBlank() && customPort.toIntOrNull() != null),
+                enabled = selectedHost != CUSTOM_HOST_KEY ||
+                    (customHost.isNotBlank() && customPort.toIntOrNull() != null && isNodeIdHex(customNodeId)),
                 onClick = {
                     if (selectedHost == AUTO_KEY) {
                         onSaveAuto()
                     } else {
-                        val (host, port) = resolvedStation(selectedHost, customHost, customPort)
-                        onSaveManual(host, port)
+                        onSaveManual(resolvedStation(selectedHost, customHost, customPort, customNodeId))
                     }
                 },
             ) {
@@ -133,13 +149,21 @@ fun SettingsScreen(
     }
 }
 
-private fun resolvedStation(selectedHost: String, customHost: String, customPort: String): Pair<String, Int> {
+private fun resolvedStation(
+    selectedHost: String,
+    customHost: String,
+    customPort: String,
+    customNodeId: String,
+): KnownStation {
     if (selectedHost != CUSTOM_HOST_KEY) {
-        val known = KNOWN_STATIONS.first { it.host == selectedHost }
-        return known.host to known.port
+        return KNOWN_STATIONS.first { it.host == selectedHost }
     }
-    return customHost.trim() to (customPort.toIntOrNull() ?: 4433)
+    return KnownStation(customHost.trim(), customPort.toIntOrNull() ?: 4433, "", "", customNodeId.lowercase())
 }
+
+private val NODE_ID_HEX = Regex("^[0-9a-fA-F]{64}$")
+
+private fun isNodeIdHex(text: String): Boolean = NODE_ID_HEX.matches(text)
 
 @Composable
 private fun StationOptionRow(label: String, sublabel: String?, selected: Boolean, onSelect: () -> Unit) {

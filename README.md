@@ -92,24 +92,23 @@ builds.
 
 ## Current status
 
-Both apps generate a puzzle-hardened Ed25519 identity via
-`FfiKeyPair.generate()`. Android keeps it across restarts in the Android
-Keystore; iOS still mints a new one on every launch
-([#5](https://github.com/macula-apps/macula-cam2me/issues/5)). Android additionally
-has: a contact list (Room-backed), a presence heartbeat (pubsub, hashed
-phone numbers, online/offline status), and station connectivity --
-either up to 3 nearest stations auto-discovered via device location and
-`hecate_stations.list_stations` (the default; see `MeshSessionPool`,
-`StationDiscovery`), or a single manually-picked station when location
-access is off. Both connection modes maintain one or more
-`FfiSession`s and run a `PresenceHeartbeat` per session.
+Both apps link `macula-rust-ffi` 0.13 (wire 1.0) and make a macula 12
+node identity (pq_hybrid) with `FfiNodeKey.generate`. Android keeps it
+across restarts in the Android Keystore; iOS still mints a new one on
+every launch and does not connect
+([#5](https://github.com/macula-apps/macula-cam2me/issues/5)). Android
+additionally has: a contact list (Room-backed), a presence heartbeat
+(pubsub, hashed phone numbers, online/offline status), and station
+connectivity in the io.macula realm, whose key the app pins -- either up
+to 3 nearest stations found through the station directory
+(`mcl-stations/list_stations`, from the device's coarse location; the
+default), or one station picked by hand. Every station is dialed with the
+node id it must prove. Both modes hold one link pool (`MeshPool`) and run
+one `PresenceHeartbeat` on it.
 
-None of that reaches the live fleet today: the pinned Rust core predates wire
-1.0, the realm constant is not io.macula's, and the directory has since been
-renamed `mcl-stations/list_stations`
-([#3](https://github.com/macula-apps/macula-cam2me/issues/3)). The presence
-payload needs a redesign before it goes live
-([#4](https://github.com/macula-apps/macula-cam2me/issues/4)).
+The presence payload needs a redesign before it goes live
+([#4](https://github.com/macula-apps/macula-cam2me/issues/4)): until
+that lands, no build is distributed.
 
 Camera capture, dial/pickup, and a real call UI are not built yet --
 that's the next pass, on both platforms.

@@ -62,44 +62,43 @@
 <rect class="b-sys" x="340" y="210" width="320" height="152" rx="10"/>
 <text class="t-name" x="356" y="238">macula-cam2me</text>
 <text class="t-type" x="356" y="256">[Android app; iOS skeleton]</text>
-<text class="t-desc" x="356" y="280">One node identity per phone. Holds up</text>
-<text class="t-desc" x="356" y="296">to 3 station sessions, publishes and</text>
+<text class="t-desc" x="356" y="280">One node identity per phone. Holds a</text>
+<text class="t-desc" x="356" y="296">pool of up to 3 stations, publishes and</text>
 <text class="t-desc" x="356" y="312">hears presence on cam2me.presence,</text>
 <text class="t-desc" x="356" y="328">matches it to contacts. No camera yet</text>
 <rect class="b-ext" x="40" y="450" width="280" height="136" rx="10"/>
 <text class="t-name" x="56" y="478">Android platform</text>
 <text class="t-type" x="56" y="496">[External system]</text>
-<text class="t-desc" x="56" y="520">The Keystore holds the node seed;</text>
+<text class="t-desc" x="56" y="520">The Keystore holds the node key;</text>
 <text class="t-desc" x="56" y="536">coarse location picks the nearest</text>
 <text class="t-desc" x="56" y="552">stations</text>
 <rect class="b-mac" x="360" y="450" width="280" height="136" rx="10"/>
 <text class="t-name" x="376" y="478">Macula stations</text>
 <text class="t-type" x="376" y="496">[Macula infrastructure]</text>
-<text class="t-desc" x="376" y="520">QUIC sessions, the pubsub fan-out</text>
-<text class="t-desc" x="376" y="536">of cam2me.presence, and the route</text>
-<text class="t-desc" x="376" y="552">for list_stations. On wire 1.0:</text>
-<text class="t-desc" x="376" y="568">unreachable from this SDK (#3)</text>
+<text class="t-desc" x="376" y="520">QUIC links (each station proves its</text>
+<text class="t-desc" x="376" y="536">node id), the pubsub fan-out of</text>
+<text class="t-desc" x="376" y="552">cam2me.presence, and the route</text>
+<text class="t-desc" x="376" y="568">for list_stations. Wire 1.0</text>
 <rect class="b-mac" x="680" y="450" width="280" height="136" rx="10"/>
 <text class="t-name" x="696" y="478">mcl-stations</text>
 <text class="t-type" x="696" y="496">[Macula infrastructure]</text>
 <text class="t-desc" x="696" y="520">The station directory, nearest</text>
-<text class="t-desc" x="696" y="536">first. The app still calls the</text>
-<text class="t-desc" x="696" y="552">retired hecate_stations name, in</text>
-<text class="t-desc" x="696" y="568">a realm that is not io.macula (#3)</text>
+<text class="t-desc" x="696" y="536">first, in io.macula: trusted under</text>
+<text class="t-desc" x="696" y="552">the realm key the app pins</text>
 <path class="edge" d="M190 150V180H400V210" marker-end="url(#a)"/>
 <text class="t-rel" x="200" y="168">number, contacts, station mode</text>
 <path class="edge-later" d="M810 150V180H600V210" marker-end="url(#a)"/>
 <text class="t-rel" x="620" y="168">watches the camera (planned, #6)</text>
 <path class="edge" d="M400 362V410H180V450" marker-end="url(#a)"/>
-<text class="t-rel" x="196" y="402">node seed, last location</text>
+<text class="t-rel" x="196" y="402">node key, last location</text>
 <path class="edge" d="M500 362V450" marker-end="url(#a)"/>
-<text class="t-rel" x="508" y="418">up to 3 sessions;</text>
+<text class="t-rel" x="508" y="418">one pool, up to 3 links;</text>
 <text class="t-rel" x="508" y="434">presence pub/sub</text>
 <path class="edge" d="M600 362V410H820V450" marker-end="url(#a)"/>
-<text class="t-rel" x="620" y="402">list_stations near (lat, lng): broken (#3)</text>
+<text class="t-rel" x="620" y="402">list_stations near (lat, lng)</text>
 <text class="t-desc" x="40" y="616">The contact is the same app on another phone: both publish a heartbeat on cam2me.presence through every station they hold,</text>
 <text class="t-desc" x="40" y="634">and each matches what it hears against its own contacts. Pull model: a viewer will dial the phone through one of those stations;</text>
-<text class="t-desc" x="40" y="652">nothing listens on the phone itself. Today the app reaches no live station (#3), and the presence payload needs a redesign (#4).</text>
+<text class="t-desc" x="40" y="652">nothing listens on the phone itself. The presence payload needs a redesign before any build is distributed (#4).</text>
 <rect class="b-sys" x="24" y="700" width="22" height="14" rx="3"/>
 <text class="t-leg" x="54" y="712">In scope</text>
 <rect class="b-per" x="110.8" y="700" width="22" height="14" rx="3"/>

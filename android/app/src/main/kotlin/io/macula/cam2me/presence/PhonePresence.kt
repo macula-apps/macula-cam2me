@@ -14,7 +14,7 @@ data class DialTarget(val host: String, val port: Int)
  * incoming `cam2me.presence` heartbeats -- payload carries a hash of the
  * sender's own phone number plus their current node_id and EVERY station
  * they're currently connected to (up to 3, for redundancy -- see
- * MeshSessionPool) -- against [Contact.phoneNumber]. Never written for a
+ * MeshPool) -- against [Contact.phoneNumber]. Never written for a
  * number that isn't a [Contact]; there's nothing to do with presence for a
  * number you haven't added.
  *
