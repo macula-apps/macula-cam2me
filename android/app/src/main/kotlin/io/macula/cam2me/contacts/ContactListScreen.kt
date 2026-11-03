@@ -33,7 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.macula.cam2me.presence.PhonePresence
-import io.macula.cam2me.reachability.ActiveStation
+import io.macula.cam2me.reachability.KnownStation
 import io.macula.cam2me.reachability.countryFlagEmoji
 
 /** A contact is shown as online if a presence heartbeat matched it more
@@ -48,7 +48,7 @@ data class ContactRow(val contact: Contact, val presence: PhonePresence?)
 fun ContactListScreen(
     contacts: List<ContactRow>,
     nowMs: Long,
-    activeStations: List<ActiveStation>,
+    stationsUp: List<KnownStation>,
     onAddContact: (phoneNumber: String, displayName: String) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -68,7 +68,7 @@ fun ContactListScreen(
             ) {
                 Text("Contacts", style = MaterialTheme.typography.headlineSmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StationIndicator(activeStations)
+                    StationIndicator(stationsUp)
                     TextButton(onClick = onOpenSettings) { Text("Settings") }
                 }
             }
@@ -103,24 +103,24 @@ fun ContactListScreen(
     }
 }
 
-/** Green when at least one mesh session is up, red otherwise -- the same
- * signal [io.macula.cam2me.presence.PresenceHeartbeat] instances are built
- * from, so "led is green" and "contacts can see me online" are the same
- * fact. Labeled with the nearest connected station (first in the list is
- * always the nearest -- see [io.macula.cam2me.reachability.StationDiscovery]
- * and [io.macula.cam2me.reachability.MeshSessionPool]'s own ordering
- * guarantees); a "+N" suffix hints at the redundant connections without
- * spelling out all three in a header that has to stay one line. */
+/** Green when at least one of the pool's links is up, red otherwise: the
+ * links [io.macula.cam2me.presence.PresenceHeartbeat] publishes on, so
+ * "led is green" and "contacts can see me online" are the same fact.
+ * Labeled with the nearest station that is up (the pool keeps the order
+ * discovery returned, nearest first; see
+ * [io.macula.cam2me.reachability.MeshPool.stationsUp]); a "+N" suffix
+ * hints at the redundant links without spelling out all three in a
+ * header that has to stay one line. */
 @Composable
-private fun StationIndicator(activeStations: List<ActiveStation>) {
-    val primary = activeStations.firstOrNull()
+private fun StationIndicator(stationsUp: List<KnownStation>) {
+    val primary = stationsUp.firstOrNull()
     // A manually-entered fallback station carries no city/country -- see
     // MainActivity's manualTarget -- so falls back to its raw host rather
     // than rendering an empty label between the dot and Settings.
     val label = primary?.let {
-        if (it.target.city.isNotBlank()) "${countryFlagEmoji(it.target.country)} ${it.target.city}" else it.target.host
+        if (it.city.isNotBlank()) "${countryFlagEmoji(it.country)} ${it.city}" else it.host
     } ?: "Offline"
-    val extra = if (activeStations.size > 1) " +${activeStations.size - 1}" else ""
+    val extra = if (stationsUp.size > 1) " +${stationsUp.size - 1}" else ""
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 12.dp)) {
         Box(

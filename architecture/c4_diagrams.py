@@ -133,28 +133,28 @@ def context():
           ["Another phone running cam2me whose", "number the owner added. Later: dials",
            "in to watch the camera (#6)"], person=True)
     d.box("b-sys", 340, 210, 320, 152, "macula-cam2me", "[Android app; iOS skeleton]",
-          ["One node identity per phone. Holds up", "to 3 station sessions, publishes and",
+          ["One node identity per phone. Holds a", "pool of up to 3 stations, publishes and",
            "hears presence on cam2me.presence,", "matches it to contacts. No camera yet"])
     d.box("b-ext", 40, 450, 280, 136, "Android platform", "[External system]",
-          ["The Keystore holds the node seed;", "coarse location picks the nearest",
+          ["The Keystore holds the node key;", "coarse location picks the nearest",
            "stations"])
     d.box("b-mac", 360, 450, 280, 136, "Macula stations", "[Macula infrastructure]",
-          ["QUIC sessions, the pubsub fan-out", "of cam2me.presence, and the route",
-           "for list_stations. On wire 1.0:", "unreachable from this SDK (#3)"])
+          ["QUIC links (each station proves its", "node id), the pubsub fan-out of",
+           "cam2me.presence, and the route", "for list_stations. Wire 1.0"])
     d.box("b-mac", 680, 450, 280, 136, "mcl-stations", "[Macula infrastructure]",
-          ["The station directory, nearest", "first. The app still calls the", "retired hecate_stations name, in",
-           "a realm that is not io.macula (#3)"])
+          ["The station directory, nearest", "first, in io.macula: trusted under",
+           "the realm key the app pins"])
     d.edge("M190 150V180H400V210")
     d.text("t-rel", 200, 168, "number, contacts, station mode")
     d.edge("M810 150V180H600V210", later=True)
     d.text("t-rel", 620, 168, "watches the camera (planned, #6)")
-    d.edge("M400 362V410H180V450"); d.text("t-rel", 196, 402, "node seed, last location")
-    d.edge("M500 362V450"); d.text("t-rel", 508, 418, "up to 3 sessions;")
+    d.edge("M400 362V410H180V450"); d.text("t-rel", 196, 402, "node key, last location")
+    d.edge("M500 362V450"); d.text("t-rel", 508, 418, "one pool, up to 3 links;")
     d.text("t-rel", 508, 434, "presence pub/sub")
-    d.edge("M600 362V410H820V450"); d.text("t-rel", 620, 402, "list_stations near (lat, lng): broken (#3)")
+    d.edge("M600 362V410H820V450"); d.text("t-rel", 620, 402, "list_stations near (lat, lng)")
     d.text("t-desc", 40, 616, "The contact is the same app on another phone: both publish a heartbeat on cam2me.presence through every station they hold,")
     d.text("t-desc", 40, 634, "and each matches what it hears against its own contacts. Pull model: a viewer will dial the phone through one of those stations;")
-    d.text("t-desc", 40, 652, "nothing listens on the phone itself. Today the app reaches no live station (#3), and the presence payload needs a redesign (#4).")
+    d.text("t-desc", 40, 652, "nothing listens on the phone itself. The presence payload needs a redesign before any build is distributed (#4).")
     d.legend(700, boundary=False)
     d.write()
 
@@ -163,25 +163,25 @@ def components():
     d = Diagram("c4-components.svg", "macula-cam2me components", 1000, 940)
     d.bound(16, 40, 968, 670, "macula-cam2me Android app [Container: Kotlin, Compose]")
     d.box("b-cmp", 32, 70, 456, 120, "MainActivity", "[Compose entry point]",
-          ["Wires the node key, station connect, the heartbeats and",
+          ["Wires the node key, station connect, the heartbeat and",
            "the contact list together; reconnects when the station",
            "preference or the location permission changes"], code=True)
     d.box("b-cmp", 512, 70, 456, 120, "onboarding", "[OnboardingScreen, OwnerPhoneNumber]",
           ["Asks once for the owner's own phone number and keeps it",
            "in DataStore; presence publishes its hash"], code=True)
-    d.box("b-cmp", 32, 220, 456, 150, "reachability", "[NodeKeyPair, MeshSessionPool, StationDiscovery]",
-          ["NodeKeyPair: one Ed25519 key per install, in the Keystore.",
+    d.box("b-cmp", 32, 220, 456, 150, "reachability", "[NodeKeyPair, MeshPool, StationDiscovery]",
+          ["NodeKeyPair: one pq_hybrid key per install, in the Keystore.",
            "StationPreference: auto (nearest 3 by coarse location) or a",
-           "fixed station. MeshSessionPool: up to 3 sessions, diffed,",
-           "pinned trust for a discovered node id, WebPKI otherwise"], code=True)
+           "fixed station. MeshPool: one pool over up to 3 stations,",
+           "each pinned to its node id; io.macula's realm key pinned"], code=True)
     d.box("b-cmp", 512, 220, 456, 150, "presence", "[PresenceHeartbeat, PhonePresence]",
-          ["One loop per session: every 30 s publish {phone_hash,",
+          ["One loop on the pool: every 30 s publish {phone_hash,",
            "stations} on cam2me.presence, and match what it hears",
            "against the contacts; a match stores the publisher's",
            "node id and stations in phone_presence"], code=True)
     d.box("b-mac", 32, 420, 456, 120, "macula-rust-ffi", "[Rust, UniFFI Kotlin bindings, via cam2me-ffi]",
-          ["FfiKeyPair, FfiSession (connect, call, publish,",
-           "subscribe, recvEvent). Pinned at 0.3.1, before wire 1.0"], code=True)
+          ["FfiNodeKey, FfiPool (connect, call, publish, subscribe,",
+           "status), FfiSubscription. 0.13, wire 1.0"], code=True)
     d.box("b-cmp", 512, 420, 456, 120, "Cam2MeDatabase", "[Room, schema v1]",
           ["Two tables: contacts and phone_presence"], code=True)
     d.box("b-cmp", 32, 570, 456, 120, "Keyring", "[io.crates.keyring, NDK context]",
@@ -191,14 +191,14 @@ def components():
           ["The owner's contacts by phone number, with each one's",
            "last presence (online, node id, stations)"], code=True)
     d.box("b-cmp", 32, 740, 456, 104, "iOS app", "[SwiftUI skeleton, XcodeGen]",
-          ["Generates a key on every launch and shows the node id;", "no mesh, no presence yet (#5)"], code=True)
+          ["Generates a pq_hybrid key each launch, shows the node id;", "no mesh, no presence yet (#5)"], code=True)
     d.box("b-later", 512, 740, 456, 104, "camera stream", "[planned: capture, serve, dial]",
           ["Capture and serve the stream; a contact dials in", "through a station (#6)"], code=True)
     d.edge("M488 130H512"); d.text("t-rel", 500, 168, "asks once", anchor="middle", rotate=-90)
     d.edge("M260 190V220"); d.text("t-rel", 268, 212, "connects on launch")
-    d.edge("M420 190V205H700V220"); d.text("t-rel", 712, 212, "starts one per session")
-    d.edge("M260 370V420"); d.text("t-rel", 268, 412, "connect, call")
-    d.edge("M600 370V390H420V420"); d.text("t-rel", 432, 410, "publish, subscribe, recvEvent")
+    d.edge("M420 190V205H700V220"); d.text("t-rel", 712, 212, "starts one on the pool")
+    d.edge("M260 370V420"); d.text("t-rel", 268, 412, "connect, call, status")
+    d.edge("M600 370V390H420V420"); d.text("t-rel", 432, 410, "publish, subscribe, next")
     d.edge("M800 370V420"); d.text("t-rel", 812, 394, "reads contacts,"); d.text("t-rel", 812, 410, "writes phone_presence")
     d.edge("M740 570V540"); d.text("t-rel", 752, 562, "reads and writes")
     d.edge("M260 540V570"); d.text("t-rel", 268, 562, "keystore load and save")

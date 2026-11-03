@@ -1,73 +1,81 @@
 package io.macula.cam2me.reachability
 
+import android.util.Log
 import io.macula.cam2me.APP_REALM
-import io.macula.sdk.FfiCallResponse
-import io.macula.sdk.FfiKeyPair
-import io.macula.sdk.FfiSession
+import io.macula.sdk.FfiConfidentiality
+import io.macula.sdk.FfiException
+import io.macula.sdk.FfiPool
 import io.macula.sdk.FfiValue
 
-private const val LIST_STATIONS_PROCEDURE = "hecate_stations.list_stations"
+/** The station directory's procedure, served by mcl-stations in io.macula. */
+private const val LIST_STATIONS_PROCEDURE = "mcl-stations/list_stations"
 private const val CALL_TIMEOUT_MS = 8_000UL
 private const val DEFAULT_QUIC_PORT = 4433
+private const val NODE_ID_BYTES = 32
+private const val TAG = "StationDiscovery"
+
+/** The list_stations call carries this device's location, so it is sealed
+ * or not sent: REQUIRED refuses a provider that names no KEM key, where
+ * PREFERRED would send the location in the clear. */
+internal val DISCOVERY_CONFIDENTIALITY = FfiConfidentiality.REQUIRED
 
 /**
- * Finds the nearest macula stations to a device location by calling
- * `hecate_stations.list_stations` over an already-connected bootstrap
- * session -- the RPC is mesh-wide (any connected station can route a CALL
- * to any advertised provider), so the bootstrap station never needs to be
- * one of the results itself.
+ * Finds the stations nearest to a device location by calling
+ * mcl-stations/list_stations through the pool: the call reaches the
+ * directory wherever it is served, so the station the pool is linked to
+ * never needs to be one of the results.
  */
 object StationDiscovery {
     /**
-     * Returns null on ANY failure (timeout, RPC error, an unparseable
-     * response) rather than throwing -- the caller's job is to fall back
-     * to the static station list, not to surface this as an app error. A
-     * mobile network is exactly the environment where this call sometimes
-     * just doesn't complete.
+     * Null on any failure (no link, no provider, a timeout, a reply of
+     * another shape) rather than a throw: the caller falls back to the
+     * station it already has. A mobile network is exactly where this call
+     * sometimes does not complete.
      */
-    suspend fun nearestStations(
-        bootstrap: FfiSession,
-        identity: FfiKeyPair,
-        lat: Double,
-        lng: Double,
-        limit: Int,
-    ): List<KnownStation>? {
+    suspend fun nearestStations(pool: FfiPool, lat: Double, lng: Double, limit: Int): List<KnownStation>? {
         val payload = ffiFields(
             "near" to ffiFields(
                 "lat" to FfiValue.Float(lat),
                 "lng" to FfiValue.Float(lng),
                 "limit" to FfiValue.Int(limit.toLong()),
             ),
+            "limit" to FfiValue.Int(limit.toLong()),
         )
-        val response = try {
-            bootstrap.call(LIST_STATIONS_PROCEDURE, APP_REALM, payload, CALL_TIMEOUT_MS, identity)
-        } catch (e: Exception) {
+        val reply = try {
+            pool.call(
+                APP_REALM, LIST_STATIONS_PROCEDURE, payload,
+                null, CALL_TIMEOUT_MS, DISCOVERY_CONFIDENTIALITY, null,
+            )
+        } catch (e: FfiException.Confidentiality) {
+            Log.w(TAG, "list_stations not sent, it could not be sealed: ${e.reason}, ${e.advertised.size} keys advertised")
+            return null
+        } catch (e: FfiException) {
+            Log.w(TAG, "list_stations failed: ${e::class.simpleName}")
             return null
         }
-        val result = response as? FfiCallResponse.Result ?: return null
-        val stations = result.payload.field("stations")?.asItems() ?: return null
-        return stations.mapNotNull { it.toKnownStation() }.take(limit)
+        val rows = reply.field("stations")?.asItems() ?: run {
+            Log.w(TAG, "list_stations reply has no stations list")
+            return null
+        }
+        val stations = rows.mapNotNull { it.toKnownStation() }.take(limit)
+        Log.i(TAG, "list_stations: ${rows.size} rows, nearest ${stations.size}: ${stations.joinToString { it.host }}")
+        return stations
     }
 
+    /** A directory row as a station to dial. Its node_id is what the pool
+     * pins, so a row without one is skipped. The hostname is dialed when
+     * the row has one; otherwise its first advertised address. */
     private fun FfiValue.toKnownStation(): KnownStation? {
-        val city = field("city")?.asText() ?: ""
-        val country = field("country")?.asText() ?: ""
+        val kind = field("kind")?.asText()
+        if (kind != null && kind != "station") return null
+        val nodeIdHex = field("node_id")?.asBytes()?.takeIf { it.size == NODE_ID_BYTES }?.toHex()
+            ?: return null
+        val host = field("hostname")?.asText()?.takeIf { it.isNotBlank() }
+            ?: field("host_advertised")?.asItems()?.firstOrNull()?.asText()
+            ?: return null
         val port = field("quic_port")?.asInt()?.toInt() ?: DEFAULT_QUIC_PORT
-        // host_advertised+node_id (Pinned trust) preferred over hostname
-        // (WebPki): host_advertised is the station's real dial address --
-        // hostname is a convenience for the subset of stations that also
-        // sit behind DNS+CA cert. A no-DNS station (stations-linode-toronto,
-        // 2026-08-29, provisioned specifically to test this) publishes
-        // host_advertised with no hostname at all; MeshSessionPool picks
-        // FfiTrust.Pinned(nodeId) whenever nodeId is non-null, which is the
-        // only mode able to validate a connection with no CA-issued cert
-        // to check -- see FfiTrust's own doc. Falling back to hostname
-        // (WebPki) covers the case where a station only published a
-        // node_record and no station_endpoint at all.
-        val pinned = field("node_id")?.asBytes()?.let { nodeId ->
-            field("host_advertised")?.asItems()?.firstOrNull()?.asText()?.let { it to nodeId }
-        }
-        val (host, nodeId) = pinned ?: ((field("hostname")?.asText() ?: return null) to null)
-        return KnownStation(host, port, city, country, nodeId)
+        val city = field("city")?.asText()?.replaceFirstChar { it.titlecase() } ?: ""
+        val country = field("country")?.asText() ?: ""
+        return KnownStation(host, port, city, country, nodeIdHex)
     }
 }

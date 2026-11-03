@@ -43,7 +43,7 @@ path = "uniffi-bindgen.rs"
 # what was built and tested is the right call here, the opposite of
 # macula-rust/macula-rust-ffi's own "don't commit the lock" policy for
 # themselves.
-macula-rust-ffi = "0.3"
+macula-rust-ffi = "0.13.1"
 # Needed for the uniffi-bindgen bin target below (uniffi_bindgen_main);
 # no standalone uniffi-bindgen-cli exists on crates.io to lean on
 # instead (checked before adding this).

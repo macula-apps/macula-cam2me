@@ -42,7 +42,18 @@ if ! command -v cargo-ndk >/dev/null 2>&1; then
     exit 1
 fi
 
+# cargo-ndk also copies every dependency cdylib it finds, under hashed
+# names (libandroid_native_keyring_store-<hash>.so,
+# libmacula_rust_ffi-<hash>.so), and the hash changes between builds.
+# Start each build from empty ABI dirs so stale copies never ship.
+# The JNI hook Keyring.kt calls, in the SDK's own library since
+# macula-rust-ffi 0.13.1 (macula-io/macula-rust#63).
+NDK_CONTEXT_HOOK="Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext"
+
 echo "==> Building cam2me-ffi for: ${ABIS[*]}"
+for abi in "${ABIS[@]}"; do
+    rm -rf "${JNI_LIBS_DIR:?}/$abi"
+done
 mkdir -p "$JNI_LIBS_DIR"
 (
     cd "$FFI_CRATE_DIR"
@@ -55,6 +66,29 @@ mkdir -p "$JNI_LIBS_DIR"
 echo "==> Renaming $BUILT_LIB_NAME.so -> $RUNTIME_LIB_NAME.so per ABI"
 for abi in "${ABIS[@]}"; do
     mv -f "$JNI_LIBS_DIR/$abi/$BUILT_LIB_NAME.so" "$JNI_LIBS_DIR/$abi/$RUNTIME_LIB_NAME.so"
+done
+
+# Only the SDK's library ships. The hashed copies are dependency cdylibs
+# nothing loads; android-native-keyring-store's own copy would even carry a
+# second ndk-context, not the one the SDK reads. Keyring.kt calls the hook
+# in libmacula_rust_ffi.so, so the build fails if that library lacks it.
+# -print -quit, not `| head -1`: under pipefail, head exiting first can
+# kill find with SIGPIPE and fail the build.
+NM="$(find "${ANDROID_NDK_HOME:?}/toolchains/llvm/prebuilt" -name llvm-nm -print -quit)"
+if [ ! -x "$NM" ]; then
+    echo "no llvm-nm under $ANDROID_NDK_HOME/toolchains/llvm/prebuilt" >&2
+    exit 1
+fi
+echo "==> Shipping only $RUNTIME_LIB_NAME.so, which must export $NDK_CONTEXT_HOOK"
+for abi in "${ABIS[@]}"; do
+    find "$JNI_LIBS_DIR/$abi" -name '*.so' ! -name "$RUNTIME_LIB_NAME.so" -delete
+    # Read the whole table before matching: `nm | grep -q` under pipefail
+    # fails on a match, since grep exits first and nm dies of SIGPIPE.
+    exports="$("$NM" -D --defined-only "$JNI_LIBS_DIR/$abi/$RUNTIME_LIB_NAME.so")"
+    if ! grep -q " $NDK_CONTEXT_HOOK\$" <<<"$exports"; then
+        echo "$abi/$RUNTIME_LIB_NAME.so does not export $NDK_CONTEXT_HOOK" >&2
+        exit 1
+    fi
 done
 
 echo "==> Regenerating Kotlin bindings"

@@ -1,15 +1,20 @@
 package io.macula.cam2me.presence
 
+import io.macula.sdk.FfiDelivery
 import io.macula.sdk.FfiEvent
-import io.macula.sdk.FfiKeyPair
-import io.macula.sdk.FfiSession
+import io.macula.sdk.FfiException
+import io.macula.sdk.FfiPool
+import io.macula.sdk.FfiSubscription
 import io.macula.sdk.FfiValue
 import java.security.MessageDigest
-import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import io.macula.cam2me.APP_REALM
@@ -17,8 +22,8 @@ import io.macula.cam2me.contacts.ContactDao
 
 private const val HEARTBEAT_INTERVAL_MS = 30_000L
 
-/** How long each recv_event poll blocks before this loop comes back
- * around to check whether a publish is due. Short enough that publish
+/** How long each wait for the next delivery blocks before this loop comes
+ * back around to check whether a publish is due. Short enough that publish
  * stays close to on-schedule, long enough not to busy-loop. */
 private const val POLL_TIMEOUT_MS = 5_000L
 
@@ -27,42 +32,54 @@ private const val POLL_TIMEOUT_MS = 5_000L
 private const val PRESENCE_TOPIC = "cam2me.presence"
 
 /**
- * Publishes this device's own (hashed) phone number + EVERY station it's
- * currently reachable through on [PRESENCE_TOPIC] every
- * [HEARTBEAT_INTERVAL_MS], and listens for the same from everyone else,
- * updating [PhonePresenceDao] wherever an incoming hash matches a known
- * contact's phone number. The sender's node_id comes from
- * [FfiEvent.publisher] itself -- no id ever appears in the topic name or
- * needs duplicating into the payload.
+ * Publishes this device's own (hashed) phone number and every station it
+ * is linked through on [PRESENCE_TOPIC] every [HEARTBEAT_INTERVAL_MS], and
+ * listens for the same from everyone else, updating [PhonePresenceDao]
+ * wherever an incoming hash matches a known contact's phone number. The
+ * sender's node id is [FfiEvent.publisher], verified by the SDK: no id
+ * appears in the topic name or needs duplicating into the payload.
  *
- * One instance per active session (see [MeshSessionPool] -- up to 3, for
- * redundancy), each running its own independent loop against its own
- * [session]. [myStations] is the FULL set every instance advertises, not
- * just the one it's bound to: a contact who only overhears ONE of the
- * (up to) 3 heartbeats still learns every viable dial address, rather
- * than needing to receive from all three to build the complete picture.
+ * One instance per pool ([io.macula.cam2me.reachability.MeshPool]): the
+ * pool publishes on all its links and its subscription hears from all of
+ * them, so one loop covers every station. [myStations] is the full set the
+ * pool was opened for.
  *
- * Runs as ONE sequential loop, never two concurrent coroutines touching
- * the same [FfiSession]. The control stream is one-frame-at-a-time per
- * [`Session::recv_event`]'s own doc: a caller expecting a pubsub delivery
- * has no reason to expect anything else to arrive first, which only holds
- * if nothing else (like a concurrent publish) is racing it for the next
- * frame off the wire. macula-rust-sdk's own live pubsub test follows the
- * same subscribe -> publish -> recv_event order, sequentially, for the
- * same reason. Multiple instances running concurrently against DIFFERENT
- * sessions is unaffected by that constraint -- it's per-session, not
- * per-process.
+ * A subscribe or publish that fails (no link up for a moment while the
+ * pool redials, or a station refusing it) is tried again at the next
+ * interval; a closed pool ends the loop. No [FfiException] leaves it.
+ * The connection indicator shows offline from the pool's own status.
+ *
+ * The payload is the one the app has always sent; issue #4 redesigns it
+ * (it exposes a hash of the phone number, and the sender is not bound to
+ * it), so nothing here is meant to outlive that.
  */
+/**
+ * Subscribes through [subscribe], trying again every [retryIntervalMs]
+ * while no link takes the register (none up yet, or the station refused
+ * it): the pool redials, so a later try can succeed. Null once the pool is
+ * closed, since nothing will take it then. Never throws an
+ * [FfiException]: one escaping the heartbeat's coroutine would end the app.
+ */
+internal suspend fun <S> subscribeWhenLinked(retryIntervalMs: Long, subscribe: suspend () -> S): S? {
+    while (true) {
+        try {
+            return subscribe()
+        } catch (_: FfiException.Closed) {
+            return null
+        } catch (_: FfiException) {
+            delay(retryIntervalMs)
+        }
+    }
+}
+
 class PresenceHeartbeat(
     private val scope: CoroutineScope,
-    private val session: FfiSession,
-    private val identity: FfiKeyPair,
+    private val pool: FfiPool,
     private val myPhoneNumber: String,
     private val myStations: List<DialTarget>,
     private val contactDao: ContactDao,
     private val phonePresenceDao: PhonePresenceDao,
 ) {
-    private val seq = AtomicLong(0)
     private var job: Job? = null
 
     fun start() {
@@ -75,25 +92,49 @@ class PresenceHeartbeat(
     }
 
     private suspend fun loop() {
-        session.subscribe(PRESENCE_TOPIC, APP_REALM, identity)
+        val subscription = subscribeWhenLinked(HEARTBEAT_INTERVAL_MS) {
+            pool.subscribe(APP_REALM, PRESENCE_TOPIC)
+        } ?: return
+        try {
+            listen(subscription)
+        } finally {
+            withContext(NonCancellable) {
+                try {
+                    subscription.unsubscribe()
+                } catch (_: FfiException) {
+                    // The pool closed first: nothing left to unsubscribe from.
+                }
+            }
+        }
+    }
+
+    private suspend fun listen(subscription: FfiSubscription) {
         val myHash = sha256Hex(myPhoneNumber)
         var lastPublishAtMs = 0L
 
-        while (scope.isActive) {
+        while (currentCoroutineContext().isActive) {
             val now = System.currentTimeMillis()
             if (now - lastPublishAtMs >= HEARTBEAT_INTERVAL_MS) {
-                publish(myHash)
                 lastPublishAtMs = now
+                try {
+                    publish(myHash)
+                } catch (_: FfiException.Closed) {
+                    return
+                } catch (_: FfiException) {
+                    // Tried again at the next interval.
+                }
             }
 
-            val event = try {
-                session.recvEvent(POLL_TIMEOUT_MS.toULong())
-            } catch (e: Exception) {
-                // The overwhelmingly common case: nothing arrived within
-                // this poll window, which is not an error worth logging
-                // every 5 seconds -- only genuinely unexpected shapes are.
+            val delivery = try {
+                subscription.next(POLL_TIMEOUT_MS.toULong())
+            } catch (_: FfiException.Closed) {
+                return
+            } catch (_: FfiException) {
+                // One event this boundary could not carry (an unopened or
+                // group-sealed one): skip it, keep listening.
                 null
             }
+            val event = (delivery as? FfiDelivery.Event)?.event
             if (event != null && event.topic == PRESENCE_TOPIC) {
                 handleEvent(event)
             }
@@ -107,14 +148,7 @@ class PresenceHeartbeat(
             .put("phone_hash", myHash)
             .put("stations", stations)
             .toString()
-        session.publish(
-            PRESENCE_TOPIC,
-            APP_REALM,
-            seq.incrementAndGet().toULong(),
-            FfiValue.Text(payload),
-            System.currentTimeMillis().toULong(),
-            identity,
-        )
+        pool.publish(APP_REALM, PRESENCE_TOPIC, FfiValue.Text(payload), null)
     }
 
     private suspend fun handleEvent(event: FfiEvent) {

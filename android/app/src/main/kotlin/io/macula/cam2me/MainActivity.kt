@@ -17,7 +17,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import io.crates.keyring.ensureAndroidNativeKeyringStoreInitialized
-import io.macula.sdk.FfiKeyPair
+import io.macula.sdk.FfiException
+import io.macula.sdk.FfiNodeKey
+import io.macula.sdk.FfiPool
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -28,14 +30,15 @@ import io.macula.cam2me.onboarding.OnboardingScreen
 import io.macula.cam2me.onboarding.OwnerPhoneNumber
 import io.macula.cam2me.presence.DialTarget
 import io.macula.cam2me.presence.PresenceHeartbeat
-import io.macula.cam2me.reachability.ActiveStation
 import io.macula.cam2me.reachability.KnownStation
 import io.macula.cam2me.reachability.LocationFix
-import io.macula.cam2me.reachability.MeshSessionPool
+import io.macula.cam2me.reachability.KNOWN_STATIONS
+import io.macula.cam2me.reachability.MeshPool
 import io.macula.cam2me.reachability.NodeKeyPair
 import io.macula.cam2me.reachability.SettingsScreen
 import io.macula.cam2me.reachability.StationDiscovery
 import io.macula.cam2me.reachability.StationPreference
+import io.macula.cam2me.reachability.connectionPlan
 
 /**
  * Wires this device's node keypair, nearest-station discovery, mesh
@@ -48,7 +51,7 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        // Required once, before any FfiKeyPair keystore method runs on
+        // Required once, before any FfiNodeKey keystore method runs on
         // Android -- see Keyring's own doc for why.
         ensureAndroidNativeKeyringStoreInitialized(applicationContext)
 
@@ -69,8 +72,8 @@ class MainActivity : ComponentActivity() {
 private fun Cam2MeApp(activity: ComponentActivity, db: Cam2MeDatabase, onReady: () -> Unit) {
     val context = activity.applicationContext
 
-    val nodeKeyPair by produceState<FfiKeyPair?>(initialValue = null) {
-        value = NodeKeyPair.loadOrCreate(context)
+    val nodeKeyPair by produceState<FfiNodeKey?>(initialValue = null) {
+        value = NodeKeyPair.loadOrCreate()
     }
     val ownerPhoneNumber by OwnerPhoneNumber.observe(context).collectAsStateWithLifecycle(initialValue = null)
     val stationPreference by StationPreference.observe(context)
@@ -105,14 +108,13 @@ private sealed class AppScreen {
 private fun ConnectedApp(
     activity: ComponentActivity,
     db: Cam2MeDatabase,
-    nodeKeyPair: FfiKeyPair,
+    nodeKeyPair: FfiNodeKey,
     preference: StationPreference.Preference,
     ownerPhoneNumber: String,
 ) {
     val context = activity.applicationContext
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Contacts) }
-    var heartbeats by remember { mutableStateOf<List<PresenceHeartbeat>>(emptyList()) }
-    var activeStations by remember { mutableStateOf<List<ActiveStation>>(emptyList()) }
+    var heartbeat by remember { mutableStateOf<PresenceHeartbeat?>(null) }
 
     var locationGranted by remember { mutableStateOf(LocationFix.hasPermission(context)) }
     val requestLocation = rememberLauncherForActivityResult(
@@ -129,42 +131,48 @@ private fun ConnectedApp(
         }
     }
 
-    val manualTarget = KnownStation(preference.stationHost, preference.stationPort, "", "")
+    // A known station keeps its city for the indicator; a custom one is
+    // shown by its host.
+    val manualTarget = KNOWN_STATIONS.find {
+        it.host == preference.stationHost && it.port == preference.stationPort
+    } ?: KnownStation(preference.stationHost, preference.stationPort, "", "", preference.stationNodeIdHex)
 
     // Re-runs whenever the manual fallback OR auto-mode OR the permission
-    // answer changes. Two-phase connect: the bootstrap/fallback station
-    // connects first (discovery needs SOME station to route the RPC
-    // through), then the real target list connects -- connectAll's own
-    // diffing reuses the bootstrap session for free if it turns out to be
-    // among the nearest 3, and closes it otherwise.
-    LaunchedEffect(preference.autoDiscovery, preference.stationHost, preference.stationPort, locationGranted) {
-        val bootstrap = MeshSessionPool.connectAll(listOf(manualTarget), nodeKeyPair).firstOrNull()?.session
+    // answer changes. Two-phase connect: the pool links to the fallback
+    // station first (discovery needs SOME link to carry the call), then to
+    // the nearest stations; MeshPool keeps the pool as it is when those are
+    // the stations it already has. No station answering leaves the app
+    // offline (the indicator says so) until one of the keys changes.
+    LaunchedEffect(
+        preference.autoDiscovery, preference.stationHost, preference.stationPort,
+        preference.stationNodeIdHex, locationGranted,
+    ) {
+        heartbeat?.stop()
+        heartbeat = null
 
-        val targets = if (preference.autoDiscovery && locationGranted && bootstrap != null) {
+        val bootstrap = connectOrNull(listOf(manualTarget), nodeKeyPair)
+
+        val plan = if (preference.autoDiscovery && locationGranted && bootstrap != null) {
             val fix = LocationFix.lastKnown(context)
             val discovered = fix?.let {
-                StationDiscovery.nearestStations(bootstrap, nodeKeyPair, it.latitude, it.longitude, limit = 3)
+                StationDiscovery.nearestStations(bootstrap, it.latitude, it.longitude, limit = 3)
             }
-            discovered?.takeIf { it.isNotEmpty() } ?: listOf(manualTarget)
+            connectionPlan(discovered, manualTarget)
         } else {
-            listOf(manualTarget)
+            listOf(listOf(manualTarget))
         }
 
-        heartbeats.forEach { it.stop() }
-        val connected = MeshSessionPool.connectAll(targets, nodeKeyPair)
-        activeStations = connected
-        val myStations = connected.map { DialTarget(it.target.host, it.target.port) }
-        heartbeats = connected.map { active ->
-            PresenceHeartbeat(
-                scope = activity.lifecycleScope,
-                session = active.session,
-                identity = nodeKeyPair,
-                myPhoneNumber = ownerPhoneNumber,
-                myStations = myStations,
-                contactDao = db.contactDao(),
-                phonePresenceDao = db.phonePresenceDao(),
-            ).also { it.start() }
-        }
+        val (targets, pool) = plan.firstNotNullOfOrNull { candidate ->
+            connectOrNull(candidate, nodeKeyPair)?.let { candidate to it }
+        } ?: return@LaunchedEffect
+        heartbeat = PresenceHeartbeat(
+            scope = activity.lifecycleScope,
+            pool = pool,
+            myPhoneNumber = ownerPhoneNumber,
+            myStations = targets.map { DialTarget(it.host, it.port) },
+            contactDao = db.contactDao(),
+            phonePresenceDao = db.phonePresenceDao(),
+        ).also { it.start() }
     }
 
     when (screen) {
@@ -173,6 +181,7 @@ private fun ConnectedApp(
                 currentAutoDiscovery = preference.autoDiscovery,
                 currentHost = preference.stationHost,
                 currentPort = preference.stationPort,
+                currentNodeIdHex = preference.stationNodeIdHex,
                 onBack = { screen = AppScreen.Contacts },
                 onSaveAuto = {
                     activity.lifecycleScope.launch {
@@ -181,16 +190,16 @@ private fun ConnectedApp(
                     }
                     screen = AppScreen.Contacts
                 },
-                onSaveManual = { host, port ->
+                onSaveManual = { station ->
                     activity.lifecycleScope.launch {
-                        StationPreference.setManualStation(context, host, port)
+                        StationPreference.setManualStation(context, station.host, station.port, station.nodeIdHex)
                     }
                     screen = AppScreen.Contacts
                 },
             )
         }
         AppScreen.Contacts -> {
-            ContactsScreen(activity, db, activeStations, onOpenSettings = { screen = AppScreen.Settings })
+            ContactsScreen(activity, db, onOpenSettings = { screen = AppScreen.Settings })
         }
     }
 }
@@ -199,7 +208,6 @@ private fun ConnectedApp(
 private fun ContactsScreen(
     activity: ComponentActivity,
     db: Cam2MeDatabase,
-    activeStations: List<ActiveStation>,
     onOpenSettings: () -> Unit,
 ) {
     val rows by remember {
@@ -211,10 +219,19 @@ private fun ContactsScreen(
 
     // Ticks the online/offline indicator forward even when nothing new
     // arrives from Room -- otherwise a contact who stopped heartbeating
-    // would stay "online" forever in a screen that never recomposes.
+    // would stay "online" forever in a screen that never recomposes. The
+    // station indicator follows the pool's links on the same tick: the
+    // pool redials a dropped link by itself, and nothing else would tell
+    // the screen.
     val nowMs by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
             value = System.currentTimeMillis()
+            delay(5_000)
+        }
+    }
+    val stationsUp by produceState(initialValue = MeshPool.stationsUp()) {
+        while (true) {
+            value = MeshPool.stationsUp()
             delay(5_000)
         }
     }
@@ -222,7 +239,7 @@ private fun ContactsScreen(
     ContactListScreen(
         contacts = rows,
         nowMs = nowMs,
-        activeStations = activeStations,
+        stationsUp = stationsUp,
         onAddContact = { phoneNumber, displayName ->
             activity.lifecycleScope.launch {
                 db.contactDao().upsert(
@@ -237,3 +254,11 @@ private fun ContactsScreen(
         onOpenSettings = onOpenSettings,
     )
 }
+
+/** The pool linked to [targets], or null when no station answered. */
+private suspend fun connectOrNull(targets: List<KnownStation>, key: FfiNodeKey): FfiPool? =
+    try {
+        MeshPool.connect(targets, key)
+    } catch (_: FfiException) {
+        null
+    }
