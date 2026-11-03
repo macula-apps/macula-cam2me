@@ -1,5 +1,7 @@
 package io.macula.cam2me.reachability
 
+import kotlinx.coroutines.withTimeoutOrNull
+
 /**
  * How long discovery waits for one requested location fix before it gives
  * up on it and stays on the fallback station.
@@ -24,4 +26,4 @@ internal suspend fun fixForDiscovery(
     cached: Fix?,
     timeoutMs: Long = FIX_REQUEST_TIMEOUT_MS,
     requestOnce: suspend () -> Fix?,
-): Fix? = cached
+): Fix? = cached ?: withTimeoutOrNull(timeoutMs) { requestOnce() }
