@@ -38,6 +38,7 @@ import io.macula.cam2me.reachability.NodeKeyPair
 import io.macula.cam2me.reachability.SettingsScreen
 import io.macula.cam2me.reachability.StationDiscovery
 import io.macula.cam2me.reachability.StationPreference
+import io.macula.cam2me.reachability.connectionPlan
 
 /**
  * Wires this device's node keypair, nearest-station discovery, mesh
@@ -151,17 +152,19 @@ private fun ConnectedApp(
 
         val bootstrap = connectOrNull(listOf(manualTarget), nodeKeyPair)
 
-        val targets = if (preference.autoDiscovery && locationGranted && bootstrap != null) {
+        val plan = if (preference.autoDiscovery && locationGranted && bootstrap != null) {
             val fix = LocationFix.lastKnown(context)
             val discovered = fix?.let {
                 StationDiscovery.nearestStations(bootstrap, it.latitude, it.longitude, limit = 3)
             }
-            discovered?.takeIf { it.isNotEmpty() } ?: listOf(manualTarget)
+            connectionPlan(discovered, manualTarget)
         } else {
-            listOf(manualTarget)
+            listOf(listOf(manualTarget))
         }
 
-        val pool = connectOrNull(targets, nodeKeyPair) ?: return@LaunchedEffect
+        val (targets, pool) = plan.firstNotNullOfOrNull { candidate ->
+            connectOrNull(candidate, nodeKeyPair)?.let { candidate to it }
+        } ?: return@LaunchedEffect
         heartbeat = PresenceHeartbeat(
             scope = activity.lifecycleScope,
             pool = pool,

@@ -43,9 +43,13 @@ object StationPreference {
                 autoDiscovery = prefs[AUTO_DISCOVERY] ?: true,
                 stationHost = prefs[STATION_HOST] ?: DEFAULT_STATION_HOST,
                 stationPort = prefs[STATION_PORT] ?: DEFAULT_STATION_PORT,
-                stationNodeIdHex = prefs[STATION_NODE_ID] ?: DEFAULT_STATION_NODE_ID,
+                stationNodeIdHex = fallbackNodeIdHex(prefs[STATION_HOST], prefs[STATION_NODE_ID]),
             )
         }
+
+    /** The node id the fallback station must prove. */
+    internal fun fallbackNodeIdHex(savedHost: String?, savedNodeIdHex: String?): String =
+        savedNodeIdHex ?: DEFAULT_STATION_NODE_ID
 
     suspend fun setAutoDiscovery(context: Context) {
         context.stationPreferenceDataStore.edit { it[AUTO_DISCOVERY] = true }

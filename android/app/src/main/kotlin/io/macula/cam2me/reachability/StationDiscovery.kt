@@ -14,6 +14,9 @@ private const val DEFAULT_QUIC_PORT = 4433
 private const val NODE_ID_BYTES = 32
 private const val TAG = "StationDiscovery"
 
+/** How the list_stations call, which carries this device's location, is sealed. */
+internal val DISCOVERY_CONFIDENTIALITY = FfiConfidentiality.PREFERRED
+
 /**
  * Finds the stations nearest to a device location by calling
  * mcl-stations/list_stations through the pool: the call reaches the
@@ -39,7 +42,7 @@ object StationDiscovery {
         val reply = try {
             pool.call(
                 APP_REALM, LIST_STATIONS_PROCEDURE, payload,
-                null, CALL_TIMEOUT_MS, FfiConfidentiality.PREFERRED, null,
+                null, CALL_TIMEOUT_MS, DISCOVERY_CONFIDENTIALITY, null,
             )
         } catch (e: FfiException) {
             Log.w(TAG, "list_stations failed: ${e::class.simpleName}")

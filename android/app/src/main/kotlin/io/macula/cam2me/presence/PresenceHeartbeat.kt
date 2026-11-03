@@ -50,6 +50,9 @@ private const val PRESENCE_TOPIC = "cam2me.presence"
  * (it exposes a hash of the phone number, and the sender is not bound to
  * it), so nothing here is meant to outlive that.
  */
+/** Subscribes through [subscribe]. */
+internal suspend fun <S> subscribeWhenLinked(retryIntervalMs: Long, subscribe: suspend () -> S): S? = subscribe()
+
 class PresenceHeartbeat(
     private val scope: CoroutineScope,
     private val pool: FfiPool,
@@ -70,7 +73,9 @@ class PresenceHeartbeat(
     }
 
     private suspend fun loop() {
-        val subscription = pool.subscribe(APP_REALM, PRESENCE_TOPIC)
+        val subscription = subscribeWhenLinked(HEARTBEAT_INTERVAL_MS) {
+            pool.subscribe(APP_REALM, PRESENCE_TOPIC)
+        } ?: return
         try {
             listen(subscription)
         } finally {

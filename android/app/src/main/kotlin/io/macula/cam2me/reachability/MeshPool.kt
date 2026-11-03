@@ -58,4 +58,8 @@ object MeshPool {
     private fun List<KnownStation>.nodeIds(): Set<String> = map { it.nodeIdHex }.toSet()
 }
 
+/** The station sets to try, in order, once discovery has answered (or not). */
+internal fun connectionPlan(discovered: List<KnownStation>?, fallback: KnownStation): List<List<KnownStation>> =
+    listOf(discovered?.takeIf { it.isNotEmpty() } ?: listOf(fallback))
+
 fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

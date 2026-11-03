@@ -99,6 +99,11 @@ dependencies {
     // number, and station host/port. Room would be the wrong tool for
     // single-row config like this.
     implementation("androidx.datastore:datastore-preferences:1.2.1")
+
+    // JVM unit tests (src/test), run by `gradle build`: the app's own
+    // connection decisions, with the SDK's calls replaced by lambdas.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }
 
 ksp {
