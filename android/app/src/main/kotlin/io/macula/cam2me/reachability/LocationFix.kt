@@ -62,10 +62,8 @@ object LocationFix {
         val provider = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
             .firstOrNull { enabled(manager, it) } ?: return null
         return suspendCancellableCoroutine { continuation ->
-            val listener = object : LocationListener {
-                override fun onLocationChanged(location: Location) {
-                    if (continuation.isActive) continuation.resume(location)
-                }
+            val listener = singleUpdateListener { fix ->
+                if (continuation.isActive) continuation.resume(fix)
             }
             continuation.invokeOnCancellation { manager.removeUpdates(listener) }
             try {
@@ -83,6 +81,15 @@ object LocationFix {
             false // the device has no such provider at all
         }
 }
+
+/** The listener a single requested fix needs, kept out of [LocationFix]
+ * so a JVM test can check its shape without a device. */
+internal fun singleUpdateListener(onFix: (Location?) -> Unit): LocationListener =
+    object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            onFix(location)
+        }
+    }
 
 /** The position in the shape discovery and its tests use. */
 internal fun Location.toFix(): Fix = Fix(latitude, longitude)
